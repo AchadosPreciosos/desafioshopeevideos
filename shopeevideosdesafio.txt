@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPA Interativo: Desafio 30 Dias Shopee Vídeos</title>
+    
+    <!-- Chosen Palette: Calm Harmony Neutrals -->
+    <!-- Application Structure Plan: A single-page dashboard with a dynamic content area. A prominent challenge selector (radio buttons) at the top allows users to switch between 4 distinct challenge plans. The selected plan's details (weekly themes, daily tasks, tips) are dynamically rendered below. An interactive donut chart visually summarizes the currently displayed challenge's structure and acts as a navigation aid. Task cards within each challenge allow users to reveal more details, track completion, and generate AI-powered content (video ideas, captions, hashtags) using the Gemini API. A dedicated bonus section explicitly links the provided media pack's niches to the challenge weeks. This structure was chosen to provide a comprehensive, yet easily navigable and interactive, resource for Shopee sellers, allowing them to choose and track their preferred 30-day content strategy, now enhanced with AI creative assistance. -->
+    <!-- Visualization & Content Choices: 1) Report Info: 4 distinct 30-day challenge plans. Goal: Inform/Organize. Viz: Dynamic Content Area controlled by radio buttons. Interaction: User selects a challenge, and its full details are rendered. Justification: Provides flexibility and allows exploration of all provided strategies within a single page. Library: Vanilla JS. 2) Report Info: Weekly structure of the selected challenge. Goal: Inform/Organize. Viz: Donut Chart. Interaction: Clicking a chart segment scrolls to the corresponding week's section. Justification: Offers a quick visual summary and enhances navigation, adapting to the selected challenge's weekly breakdown. Library: Chart.js (Canvas). 3) Report Info: Daily video ideas and production tips. Goal: Inform/Organize. Viz: Interactive Cards. Interaction: A button toggles the visibility of production tips, a checkbox allows users to mark tasks as complete, and new buttons trigger AI content generation. Justification: Breaks down information into manageable chunks, prevents overload, adds a motivational progress-tracking feature, and provides AI-powered creative assistance. Library: Vanilla JS, Gemini API. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FDF8F0;
+            color: #4A4A4A;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            height: auto;
+            margin: auto;
+        }
+        .task-card {
+            transition: all 0.3s ease-in-out;
+            border-width: 2px;
+        }
+        .task-card.completed {
+            border-color: #10B981;
+            background-color: #F0FDF4;
+            transform: scale(1.02);
+        }
+        .task-card.completed .task-title {
+            text-decoration: line-through;
+            color: #52525B;
+        }
+        .smooth-scroll {
+            scroll-behavior: smooth;
+        }
+        .nav-link {
+            transition: all 0.2s ease;
+        }
+        .nav-link:hover {
+            color: #F97316;
+            transform: translateY(-2px);
+        }
+        .challenge-selector input[type="radio"]:checked + label {
+            background-color: #F97316;
+            color: white;
+            border-color: #F97316;
+        }
+        .challenge-selector label {
+            transition: all 0.2s ease;
+        }
+        .llm-results-area {
+            background-color: #f7f7f7;
+            border-left: 4px solid #F97316;
+            padding: 10px;
+            margin-top: 15px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            color: #333;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .loading-spinner {
+            display: inline-block;
+            width: 1em;
+            height: 1em;
+            border: 2px solid rgba(0,0,0,.3);
+            border-radius: 50%;
+            border-top-color: #F97316;
+            animation: spin 1s ease-in-out infinite;
+            -webkit-animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { -webkit-transform: rotate(360deg); }
+        }
+        @-webkit-keyframes spin {
+            to { -webkit-transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="smooth-scroll">
+
+    <header class="bg-white/80 backdrop-blur-lg shadow-md sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-4">
+            <h1 class="text-2xl md:text-4xl font-extrabold text-center text-orange-600">
+                Desafio 30 Dias Shopee Vídeos
+            </h1>
+            <p class="text-center text-gray-600 mt-1">Seu Guia Interativo para Dominar o Conteúdo e Vender Mais</p>
+        </div>
+        <nav class="bg-white shadow-sm">
+            <ul id="main-nav" class="flex items-center justify-center space-x-4 sm:space-x-8 p-3 text-sm font-medium text-gray-700">
+                <!-- Navigation links will be dynamically generated based on the selected challenge -->
+            </ul>
+        </nav>
+    </header>
+
+    <main class="container mx-auto p-4 md:p-8">
+
+        <!-- Challenge Selector Section -->
+        <section class="text-center mb-12">
+            <h2 class="text-2xl font-bold mb-4">Escolha Seu Desafio:</h2>
+            <div class="challenge-selector flex flex-wrap justify-center gap-4 mb-8">
+                <input type="radio" id="challenge1" name="challenge_option" value="option1" class="hidden">
+                <label for="challenge1" class="cursor-pointer px-6 py-3 rounded-full border-2 border-gray-300 text-gray-700 font-semibold hover:bg-orange-100 hover:border-orange-400">Opção 1: Meu Produto, Minha História</label>
+
+                <input type="radio" id="challenge2" name="challenge_option" value="option2" class="hidden">
+                <label for="challenge2" class="cursor-pointer px-6 py-3 rounded-full border-2 border-gray-300 text-gray-700 font-semibold hover:bg-orange-100 hover:border-orange-400">Opção 2: Guia Essencial de Produtos</label>
+
+                <input type="radio" id="challenge3" name="challenge_option" value="option3" class="hidden">
+                <label for="challenge3" class="cursor-pointer px-6 py-3 rounded-full border-2 border-gray-300 text-gray-700 font-semibold hover:bg-orange-100 hover:border-orange-400">Opção 3: Trend Hunter</label>
+
+                <input type="radio" id="challenge4" name="challenge_option" value="option4" class="hidden" checked>
+                <label for="challenge4" class="cursor-pointer px-6 py-3 rounded-full border-2 border-gray-300 text-gray-700 font-semibold hover:bg-orange-100 hover:border-orange-400">Opção 4: Meu Mix de Sucesso (Recomendado)</label>
+            </div>
+
+            <div id="challenge-overview" class="mb-8">
+                <h2 class="text-2xl font-bold mb-2" id="current-challenge-title"></h2>
+                <p class="max-w-2xl mx-auto text-gray-600 mb-6" id="current-challenge-description"></p>
+                <div class="chart-container">
+                    <canvas id="challengeChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dynamic Challenge Content Area -->
+        <div id="dynamic-challenge-content">
+            <!-- Content will be loaded here by JavaScript -->
+        </div>
+        
+        <!-- Essential Tips -->
+        <section id="dicas" class="mb-16 pt-16 -mt-16">
+            <h2 class="text-3xl font-bold mb-3 text-gray-800 border-b-2 border-gray-300 pb-2">Dicas Essenciais para o Sucesso</h2>
+            <p class="text-gray-600 mb-8">Aplique estas estratégias em todos os seus vídeos para maximizar o impacto e os resultados do seu desafio.</p>
+            <ul class="space-y-4">
+                <li class="bg-white p-4 rounded-lg shadow"><strong>Consistência é Chave:</strong> Mantenha o ritmo diário de postagens. A regularidade é crucial para o algoritmo e para o público.</li>
+                <li class="bg-white p-4 rounded-lg shadow"><strong>Qualidade do Vídeo:</strong> Invista em boa iluminação (luz natural é sua melhor amiga!), áudio claro e edição simples e dinâmica.</li>
+                <li class="bg-white p-4 rounded-lg shadow"><strong>Hashtags Estratégicas:</strong> Pesquise hashtags em alta e crie uma exclusiva para o seu desafio. Use uma combinação de hashtags amplas e específicas.</li>
+                <li class="bg-white p-4 rounded-lg shadow"><strong>Interaja com a Audiência:</strong> Responda a todos os comentários e perguntas. O engajamento gera mais visibilidade.</li>
+                <li class="bg-white p-4 rounded-lg shadow"><strong>Call to Action (CTA) Claro:</strong> Sempre finalize seus vídeos com uma chamada clara para a ação ("Compre agora!", "Visite minha loja!").</li>
+                <li class="bg-white p-4 rounded-lg shadow"><strong>Analise os Resultados:</strong> Monitore o que funciona melhor e ajuste sua estratégia usando as ferramentas de análise da Shopee.</li>
+            </ul>
+        </section>
+
+        <!-- Bonus Section -->
+        <section id="bonus" class="pt-16 -mt-16">
+            <div class="bg-gradient-to-r from-orange-500 to-amber-500 text-white p-8 rounded-xl shadow-2xl text-center">
+                <h2 class="text-3xl font-extrabold mb-3">BÔNUS EXCLUSIVO PARA VOCÊ!</h2>
+                <p class="mb-2">Acelere sua criação de conteúdo com acesso a um acervo gigantesco de vídeos e imagens editáveis.</p>
+                <p class="font-bold mb-6">PACK COM MAIS DE 1000 MÍDIAS PRONTAS PARA POSTAR!</p>
+                <p class="text-sm italic mb-6">Este pack contém mídias separadas por nichos, perfeitas para complementar as semanas do seu desafio:</p>
+                <div class="flex flex-wrap justify-center gap-4 text-sm mb-8">
+                    <span class="bg-white text-orange-700 px-3 py-1 rounded-full shadow-md">Casa e Decoração (Semana 1)</span>
+                    <span class="bg-white text-teal-700 px-3 py-1 rounded-full shadow-md">Maternidade (Semana 2)</span>
+                    <span class="bg-white text-rose-700 px-3 py-1 rounded-full shadow-md">Beleza (Semana 3)</span>
+                    <span class="bg-white text-indigo-700 px-3 py-1 rounded-full shadow-md">Moda (Semana 4)</span>
+                    <span class="bg-white text-gray-700 px-3 py-1 rounded-full shadow-md">Eletrônicos</span>
+                    <span class="bg-white text-gray-700 px-3 py-1 rounded-full shadow-md">Variados</span>
+                </div>
+                <a href="https://t.me/viralizandoshopee" target="_blank" rel="noopener noreferrer" class="inline-block bg-white text-orange-600 font-bold py-3 px-8 rounded-full shadow-lg hover:bg-gray-100 transition-transform transform hover:scale-105">
+                    Acessar Agora
+                </a>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const challengeData = {
+                option1: {
+                    title: 'Desafio: Meu Produto, Minha História',
+                    description: 'Este desafio incentiva a criação de vídeos mais pessoais e com storytelling, conectando o público à sua marca de uma forma mais profunda.',
+                    weeks: [
+                        { id: 'semana1-opt1', title: 'Semana 1: Conectando com a Marca', niche: 'Marca/Storytelling', color: 'rgba(249, 115, 22, 0.7)', border: 'rgba(249, 115, 22, 1)', tasks: [
+                            { days: 'Dias 1-3', idea: 'Apresente você/sua equipe e o propósito da sua loja.', tips: 'Compartilhe sua paixão e o que te motiva. Use um tom pessoal e convidativo.', basePrompt: 'Apresentar a si mesmo/equipe e o propósito da loja.' },
+                            { days: 'Dias 4-6', idea: 'Mostre o processo de criação ou escolha de um produto.', tips: 'Filme os bastidores, a curadoria ou a inspiração por trás de um item. Mostre o cuidado e a qualidade.', basePrompt: 'Mostrar o processo de criação ou escolha de um produto.' },
+                            { days: 'Dia 7', idea: 'Compartilhe um "antes e depois" de um cliente usando seu produto ou um depoimento.', tips: 'Peça permissão para usar depoimentos reais. Foque no impacto positivo do seu produto na vida do cliente.', basePrompt: 'Compartilhar um "antes e depois" de um cliente usando o produto ou um depoimento.' }
+                        ]},
+                        { id: 'semana2-opt1', title: 'Semana 2: A Vida do Produto', niche: 'Produto/Demonstração', color: 'rgba(20, 184, 166, 0.7)', border: 'rgba(20, 184, 166, 1)', tasks: [
+                            { days: 'Dias 8-10', idea: 'Mostre o produto em diferentes contextos de uso.', tips: 'Ex: roupas em looks variados, utensílios de cozinha em receitas. Crie cenários que inspirem.', basePrompt: 'Mostrar o produto em diferentes contextos de uso.' },
+                            { days: 'Dias 11-13', idea: 'Fale sobre os benefícios específicos de cada produto, um por dia.', tips: 'Vá além das características. Como o produto resolve um problema ou melhora a vida do cliente?', basePrompt: 'Falar sobre os benefícios específicos de cada produto.' },
+                            { days: 'Dia 14', idea: 'Responda às perguntas mais frequentes sobre um produto específico.', tips: 'Use o formato de Q&A. Seja claro e objetivo. Isso constrói confiança.', basePrompt: 'Responder às perguntas mais frequentes sobre um produto específico.' }
+                        ]},
+                        { id: 'semana3-opt1', title: 'Semana 3: Bastidores e Curiosidades', niche: 'Bastidores/Curiosidades', color: 'rgba(225, 29, 72, 0.7)', border: 'rgba(225, 29, 72, 1)', tasks: [
+                            { days: 'Dias 15-17', idea: 'Mostre a embalagem, o envio ou um "dia na vida" da sua loja.', tips: 'Humanize sua marca. Mostre o cuidado com cada etapa do processo. Use time-lapse.', basePrompt: 'Mostrar a embalagem, o envio ou um "dia na vida" da loja.' },
+                            { days: 'Dias 18-20', idea: 'Compartilhe curiosidades ou fatos pouco conhecidos sobre seus produtos ou matéria-prima.', tips: 'Conte histórias interessantes sobre a origem ou a fabricação. Desperte a curiosidade.', basePrompt: 'Compartilhar curiosidades ou fatos pouco conhecidos sobre produtos ou matéria-prima.' },
+                            { days: 'Dia 21', idea: 'Apresente um "produto estrela" e por que ele é especial para você.', tips: 'Compartilhe sua paixão por esse item. Conte a história por trás dele e seus diferenciais.', basePrompt: 'Apresentar um "produto estrela" e por que ele é especial.' }
+                        ]},
+                        { id: 'semana4-opt1', title: 'Semana 4: Interação e Chamada para Ação', niche: 'Engajamento/Vendas', color: 'rgba(79, 70, 229, 0.7)', border: 'rgba(79, 70, 229, 1)', tasks: [
+                            { days: 'Dias 22-24', idea: 'Peça aos seguidores para compartilharem suas experiências com seus produtos.', tips: 'Incentive o conteúdo gerado pelo usuário (UGC). Crie uma hashtag para isso.', basePrompt: 'Pedir aos seguidores para compartilharem suas experiências com os produtos.' },
+                            { days: 'Dias 25-27', idea: 'Faça enquetes ou perguntas sobre quais produtos eles gostariam de ver em vídeo.', tips: 'Use as ferramentas interativas da Shopee. Isso gera ideias e engajamento.', basePrompt: 'Fazer enquetes ou perguntas sobre produtos que gostariam de ver em vídeo.' },
+                            { days: 'Dias 28-30', idea: 'Anuncie uma oferta especial ou um cupom de desconto exclusivo para quem assiste aos vídeos.', tips: 'Crie um senso de urgência e exclusividade. Direcione claramente para a compra.', basePrompt: 'Anunciar uma oferta especial ou cupom de desconto exclusivo para quem assiste aos vídeos.' }
+                        ]}
+                    ]
+                },
+                option2: {
+                    title: 'Desafio: Guia Essencial de Produtos',
+                    description: 'Esta opção é ideal para quem quer focar na demonstração de produtos, suas funcionalidades e como eles podem resolver problemas ou melhorar a vida dos clientes.',
+                    weeks: [
+                        { id: 'semana1-opt2', title: 'Semana 1: Primeiros Passos e Destaques', niche: 'Destaque de Produtos', color: 'rgba(249, 115, 22, 0.7)', border: 'rgba(249, 115, 22, 1)', tasks: [
+                            { days: 'Dias 1-3', idea: 'Apresente seus 3 produtos mais vendidos e por que eles são populares.', tips: 'Foque nos benefícios que os tornam campeões de venda. Use depoimentos se tiver.', basePrompt: 'Apresentar os 3 produtos mais vendidos e suas razões de popularidade.' },
+                            { days: 'Dias 4-6', idea: 'Faça um vídeo de "unboxing" ou "primeira impressão" de um produto.', tips: 'Mostre a experiência de abrir a embalagem. Realce a qualidade e o cuidado com o envio.', basePrompt: 'Fazer um vídeo de "unboxing" ou "primeira impressão" de um produto.' },
+                            { days: 'Dia 7', idea: 'Mostre a montagem ou o preparo de um produto que exija isso.', tips: 'Simplifique o processo para o cliente. Use time-lapse para produtos complexos.', basePrompt: 'Mostrar a montagem ou o preparo de um produto.' }
+                        ]},
+                        { id: 'semana2-opt2', title: 'Semana 2: Demonstração em Ação', niche: 'Demonstração de Uso', color: 'rgba(20, 184, 166, 0.7)', border: 'rgba(20, 184, 166, 1)', tasks: [
+                            { days: 'Dias 8-10', idea: 'Demonstre como usar 3 produtos diferentes (um por dia).', tips: 'Mostre o produto em uso real, destacando suas funcionalidades e facilidade de manuseio.', basePrompt: 'Demonstrar como usar 3 produtos diferentes.' },
+                            { days: 'Dias 11-13', idea: 'Compare dois produtos similares e explique as diferenças.', tips: 'Ajude o cliente a escolher. Destaque os prós e contras de cada um de forma imparcial.', basePrompt: 'Comparar dois produtos similares e explicar as diferenças.' },
+                            { days: 'Dia 14', idea: 'Crie um vídeo de "hack" ou dica de uso inesperado de um produto.', tips: 'Surpreenda e mostre a versatilidade. Isso gera compartilhamento e interesse.', basePrompt: 'Criar um vídeo de "hack" ou dica de uso inesperado de um produto.' }
+                        ]},
+                        { id: 'semana3-opt2', title: 'Semana 3: Soluções e Combinações', niche: 'Soluções e Kits', color: 'rgba(225, 29, 72, 0.7)', border: 'rgba(225, 29, 72, 1)', tasks: [
+                            { days: 'Dias 15-17', idea: 'Mostre como seus produtos resolvem problemas comuns.', tips: 'Identifique dores do cliente e apresente seu produto como a solução ideal.', basePrompt: 'Mostrar como os produtos resolvem problemas comuns.' },
+                            { days: 'Dias 18-20', idea: 'Crie "kits" ou "combinações" de produtos que se complementam.', tips: 'Incentive a compra de mais itens. Mostre como eles funcionam bem juntos.', basePrompt: 'Criar "kits" ou "combinações" de produtos que se complementam.' },
+                            { days: 'Dia 21', idea: 'Responda a 5 perguntas frequentes sobre o uso de um produto complexo.', tips: 'Descomplique. Use recursos visuais para explicar conceitos difíceis.', basePrompt: 'Responder a 5 perguntas frequentes sobre o uso de um produto complexo.' }
+                        ]},
+                        { id: 'semana4-opt2', title: 'Semana 4: Manutenção, Cuidados e Ofertas', niche: 'Cuidados e Ofertas', color: 'rgba(79, 70, 229, 0.7)', border: 'rgba(79, 70, 229, 1)', tasks: [
+                            { days: 'Dias 22-24', idea: 'Dê dicas de cuidado e manutenção para prolongar a vida útil de seus produtos.', tips: 'Mostre o valor a longo prazo. Isso fideliza o cliente e reduz devoluções.', basePrompt: 'Dar dicas de cuidado e manutenção para prolongar a vida útil dos produtos.' },
+                            { days: 'Dias 25-27', idea: 'Mostre como seus produtos se encaixam em diferentes estilos de vida ou necessidades.', tips: 'Personalize a mensagem. Ex: para estudantes, para mães, para atletas.', basePrompt: 'Mostrar como os produtos se encaixam em diferentes estilos de vida ou necessidades.' },
+                            { days: 'Dias 28-30', idea: 'Anuncie um lançamento, uma promoção de 24 horas ou um combo especial.', tips: 'Crie um senso de urgência e exclusividade para os últimos dias do desafio.', basePrompt: 'Anunciar um lançamento, promoção de 24 horas ou combo especial.' }
+                        ]}
+                    ]
+                },
+                option3: {
+                    title: 'Desafio: Trend Hunter',
+                    description: 'Este desafio explora as tendências do Shopee Vídeos e do TikTok, adaptando-as aos seus produtos para maximizar o alcance e a interação.',
+                    weeks: [
+                        { id: 'semana1-opt3', title: 'Semana 1: Tendências em Alta', niche: 'Tendências Virais', color: 'rgba(249, 115, 22, 0.7)', border: 'rgba(249, 115, 22, 1)', tasks: [
+                            { days: 'Dias 1-3', idea: 'Adapte um áudio ou trend popular com seus produtos (ex: "POV", "Seu ____ x Meu ____").', tips: 'Pesquise o que está bombando. Seja criativo e rápido na adaptação.', basePrompt: 'Adaptar um áudio ou trend popular com os produtos.' },
+                            { days: 'Dias 4-6', idea: 'Crie um vídeo de transição criativo com seus produtos.', tips: 'Use transições suaves ou impactantes. Mostre a transformação ou a variedade de itens.', basePrompt: 'Criar um vídeo de transição criativo com os produtos.' },
+                            { days: 'Dia 7', idea: 'Faça um "challenge" rápido (ex: 5 segundos para arrumar algo com seu produto).', tips: 'Desafie seus seguidores. Crie algo divertido e fácil de replicar.', basePrompt: 'Fazer um "challenge" rápido com o produto.' }
+                        ]},
+                        { id: 'semana2-opt3', title: 'Semana 2: Humor e Interação', niche: 'Humor e Engajamento', color: 'rgba(20, 184, 166, 0.7)', border: 'rgba(20, 184, 166, 1)', tasks: [
+                            { days: 'Dias 8-10', idea: 'Use um meme ou áudio engraçado relacionado a situações do dia a dia onde seu produto ajuda.', tips: 'Conecte-se com o público de forma leve. O humor gera compartilhamento.', basePrompt: 'Usar um meme ou áudio engraçado relacionado a situações do dia a dia onde o produto ajuda.' },
+                            { days: 'Dias 11-13', idea: 'Faça vídeos de perguntas e respostas rápidas com seus produtos (ex: "Este ou Aquele?").', tips: 'Use a função de enquete. Incentive a interação e a decisão do cliente.', basePrompt: 'Fazer vídeos de perguntas e respostas rápidas com os produtos.' },
+                            { days: 'Dia 14', idea: 'Crie um "quiz" visual ou "adivinhe o produto" com seus itens.', tips: 'Desafie o conhecimento dos seguidores. Use close-ups e ângulos diferentes.', basePrompt: 'Criar um "quiz" visual ou "adivinhe o produto" com os itens.' }
+                        ]},
+                        { id: 'semana3-opt3', title: 'Semana 3: Criatividade Visual', niche: 'Criatividade Visual', color: 'rgba(225, 29, 72, 0.7)', border: 'rgba(225, 29, 72, 1)', tasks: [
+                            { days: 'Dias 15-17', idea: 'Mostre uma "transformação" ou "antes e depois" usando um de seus produtos.', tips: 'Pode ser uma mudança de estilo, de ambiente ou de aparência. Foque no impacto visual.', basePrompt: 'Mostrar uma "transformação" ou "antes e depois" usando um produto.' },
+                            { days: 'Dias 18-20', idea: 'Faça um vídeo com efeito de câmera lenta ou rápido destacando detalhes do produto.', tips: 'Valorize a textura, o material, o acabamento. Crie um vídeo hipnotizante.', basePrompt: 'Fazer um vídeo com efeito de câmera lenta ou rápido destacando detalhes do produto.' },
+                            { days: 'Dia 21', idea: 'Crie um "mini-vlog" mostrando seu produto em um cenário interessante.', tips: 'Leve o produto para um passeio. Mostre-o em um ambiente real e inspirador.', basePrompt: 'Criar um "mini-vlog" mostrando o produto em um cenário interessante.' }
+                        ]},
+                        { id: 'semana4-opt3', title: 'Semana 4: Chamada à Ação Viral', niche: 'Ação Viral/Concurso', color: 'rgba(79, 70, 229, 0.7)', border: 'rgba(79, 70, 229, 1)', tasks: [
+                            { days: 'Dias 22-24', idea: 'Incentive os seguidores a criarem vídeos com seus produtos usando uma hashtag específica.', tips: 'Promova o conteúdo gerado pelo usuário (UGC). Ofereça um incentivo.', basePrompt: 'Incentivar seguidores a criarem vídeos com os produtos usando uma hashtag específica.' },
+                            { days: 'Dias 25-27', idea: 'Reaja a vídeos de clientes usando seus produtos (se tiver).', tips: 'Mostre que você valoriza seus clientes. Compartilhe e comente os vídeos deles.', basePrompt: 'Reagir a vídeos de clientes usando os produtos.' },
+                            { days: 'Dias 28-30', idea: 'Lance um "mini-concurso" no final do desafio, pedindo para as pessoas usarem um filtro ou música específica e mostrarem como seus produtos se encaixam em suas vidas, com um prêmio para o melhor vídeo.', tips: 'Crie um senso de competição saudável e recompense o engajamento. Divulgue amplamente.', basePrompt: 'Lançar um "mini-concurso" no final do desafio.' }
+                        ]}
+                    ]
+                },
+                option4: {
+                    title: 'Desafio: Meu Mix de Sucesso',
+                    description: 'Este desafio é perfeito para lojas com um mix de produtos variado, permitindo que você explore cada categoria com vídeos dedicados, mantendo o interesse de diferentes públicos ao longo do mês.',
+                    weeks: [
+                        { id: 'semana1-opt4', title: 'Semana 1: Lar, Doce Lar (Casa e Decoração)', niche: 'Casa e Decoração', color: 'rgba(249, 115, 22, 0.7)', border: 'rgba(249, 115, 22, 1)', tasks: [
+                            { days: 'Dias 1-3', idea: 'Transformação de Ambientes: Crie vídeos de "antes e depois" dinâmicos usando seus itens de decoração.', tips: 'Utilize transições rápidas e músicas populares. Filmagens curtas, bem iluminadas e com foco nos detalhes são cruciais.', basePrompt: 'Criar vídeos de "antes e depois" dinâmicos usando itens de decoração para transformação de ambientes.' },
+                            { days: 'Dias 4-5', idea: 'Organização e Funcionalidade: Apresente soluções inteligentes para organização da casa que você vende (potes, cestos, nichos).', tips: 'Demonstre a praticidade e a funcionalidade de cada item em uso. Filmar a ação de organizar e o resultado final é mais eficaz.', basePrompt: 'Apresentar soluções inteligentes para organização da casa.' },
+                            { days: 'Dias 6-7', idea: 'Detalhes que Encantam: Destaque itens menores que fazem uma grande diferença na decoração (velas, luminárias, pequenos objetos de arte).', tips: 'Crie um clima aconchegante e convidativo com iluminação suave. Use efeitos de câmera lenta ou close-ups para valorizar a beleza de cada peça.', basePrompt: 'Destacar itens menores que fazem grande diferença na decoração.' }
+                        ]},
+                        { id: 'semana2-opt4', title: 'Semana 2: Pequenos Tesouros, Grandes Cuidados (Maternidade e Bebê)', niche: 'Maternidade e Bebê', color: 'rgba(20, 184, 166, 0.7)', border: 'rgba(20, 184, 166, 1)', tasks: [
+                            { days: 'Dias 8-10', idea: 'Essenciais para o Bebê: Demonstre itens indispensáveis para o cuidado diário do bebê (kits de higiene, trocadores portáteis, paninhos de boca).', tips: 'Foque na praticidade, higiene, segurança e conforto dos produtos. Se possível, use um modelo (bebê ou boneca) para mostrar o uso de forma fofa e realista.', basePrompt: 'Demonstrar itens indispensáveis para o cuidado diário do bebê.' },
+                            { days: 'Dias 11-12', idea: 'Quarto dos Sonhos: Crie vídeos inspiradores mostrando como montar ou decorar um cantinho especial para o bebê usando seus produtos (kits de berço, móbiles, decorações).', tips: 'Explore a fofura, o conforto e a segurança do ambiente. Use músicas suaves e uma iluminação que transmita calma e aconchego.', basePrompt: 'Mostrar como montar ou decorar um cantinho especial para o bebê.' },
+                            { days: 'Dias 13-14', idea: 'Facilitando a Rotina da Mamãe: Dê dicas e apresente produtos que realmente ajudam na rotina intensa da maternidade (bolsas térmicas, babadores práticos, brinquedos educativos).', tips: 'Demonstre como seus produtos apoiam as mães em diferentes situações do dia a dia. Pode ser um vídeo mais narrado, mostrando empatia e soluções reais.', basePrompt: 'Apresentar produtos que ajudam na rotina da maternidade.' }
+                        ]},
+                        { id: 'semana3-opt4', title: 'Semana 3: Beleza e Bem-Estar (Cosméticos e Cuidados Pessoais)', niche: 'Beleza e Cuidados Pessoais', color: 'rgba(225, 29, 72, 0.7)', border: 'rgba(225, 29, 72, 1)', tasks: [
+                            { days: 'Dias 15-17', idea: 'Rotina de Skincare/Beleza: Demonstre um passo a passo de uma rotina de cuidados completa usando seus produtos (skincare, maquiagem, cuidados capilares).', tips: 'Mostre as texturas dos produtos, a forma de aplicação e os resultados imediatos. Use close-ups. A autenticidade é muito valorizada.', basePrompt: 'Demonstrar uma rotina de skincare/beleza completa.' },
+                            { days: 'Dias 18-19', idea: 'Dicas e Truques: Compartilhe dicas rápidas de beleza ou truques de aplicação de produtos (como aplicar uma máscara, truques de maquiagem).', tips: 'Vídeos curtos e diretos, com legendas claras para facilitar a compreensão. Foque em resolver uma "dor" ou curiosidade comum.', basePrompt: 'Compartilhar dicas rápidas de beleza ou truques de aplicação de produtos.' },
+                            { days: 'Dias 20-21', idea: 'Ingredientes e Benefícios: Fale sobre os ativos e ingredientes especiais dos seus produtos e seus benefícios (ácido hialurônico, vitaminas, produtos veganos).', tips: 'Pode ser um vídeo mais explicativo, mas sempre visual e didático. Mostre o produto enquanto fala, aproxime para ler o rótulo.', basePrompt: 'Falar sobre os ingredientes e benefícios dos produtos de beleza.' }
+                        ]},
+                        { id: 'semana4-opt4', title: 'Semana 4: Mundo Fashion e Acessórios (Moda e Estilo)', niche: 'Moda e Acessórios', color: 'rgba(79, 70, 229, 0.7)', border: 'rgba(79, 70, 229, 1)', tasks: [
+                            { days: 'Dias 22-24', idea: 'Montando Looks: Crie diferentes composições de looks usando suas roupas e acessórios para diversas ocasiões (casual, trabalho, festa).', tips: 'Use transições de troca de roupa rápidas ("get ready with me"). Músicas em alta e poses dinâmicas são essenciais.', basePrompt: 'Criar diferentes composições de looks usando roupas e acessórios.' },
+                            { days: 'Dias 25-26', idea: 'Destaque de Peças-Chave: Apresente uma peça ou acessório específico e mostre 3 ou mais formas diferentes de usá-la.', tips: 'Dê dicas de estilo e combine com outros itens. O foco é na versatilidade e no custo-benefício da peça.', basePrompt: 'Apresentar uma peça ou acessório chave e várias formas de usá-la.' },
+                            { days: 'Dias 27-28', idea: 'Tendências e Novidades: Explore as últimas tendências de moda e como seus produtos se encaixam nelas. Apresente lançamentos ou promoções.', tips: 'Seja um "fashionista" e um "trendsetter". Comente sobre as cores da estação, os cortes que estão em alta e como suas peças se alinham.', basePrompt: 'Explorar as últimas tendências de moda e como os produtos se encaixam.' },
+                            { days: 'Dias 29-30', idea: 'Seu Estilo, Nossa Marca + Conclusão do Desafio: Convide seguidores a compartilharem seus looks com uma hashtag. Encerre com um agradecimento e uma oferta final.', tips: 'Anuncie uma oferta final de 24h/48h ou um sorteio para quem participou. Crie um senso de comunidade e recompense o engajamento.', basePrompt: 'Convidar seguidores a compartilharem looks e concluir o desafio com uma oferta.' }
+                        ]}
+                    ]
+                }
+            };
+
+            let challengeChartInstance = null; 
+
+            function wrapLabel(label, maxCharsPerLine) {
+                if (label.length <= maxCharsPerLine) {
+                    return label;
+                }
+                const words = label.split(' ');
+                let lines = [];
+                let currentLine = '';
+                words.forEach(word => {
+                    if ((currentLine + word).length <= maxCharsPerLine) {
+                        currentLine += (currentLine === '' ? '' : ' ') + word;
+                    } else {
+                        lines.push(currentLine);
+                        currentLine = word;
+                    }
+                });
+                lines.push(currentLine);
+                return lines;
+            }
+
+            async function generateContent(prompt, targetElement, loadingElement) {
+                loadingElement.innerHTML = '<span class="loading-spinner"></span> Gerando...';
+                targetElement.textContent = '';
+                try {
+                    const chatHistory = [];
+                    chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+                    const payload = { contents: chatHistory };
+                    const apiKey = ""; 
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                    
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.candidates && result.candidates.length > 0 &&
+                        result.candidates[0].content && result.candidates[0].content.parts &&
+                        result.candidates[0].content.parts.length > 0) {
+                        const text = result.candidates[0].content.parts[0].text;
+                        targetElement.textContent = text;
+                    } else {
+                        targetElement.textContent = 'Erro ao gerar conteúdo. Tente novamente.';
+                    }
+                } catch (error) {
+                    targetElement.textContent = 'Erro de conexão ou API. Verifique sua rede.';
+                } finally {
+                    loadingElement.innerHTML = '';
+                }
+            }
+
+            function handleGenerateVideoIdea(taskData, weekTitle, niche, llmResultsArea, loadingSpinner) {
+                const prompt = `Gere 3 ideias criativas e curtas para um vídeo do Shopee Vídeos, baseadas na seguinte tarefa: '${taskData.basePrompt}'. O vídeo é sobre '${weekTitle}'. O nicho principal é '${niche}'. As ideias devem ser práticas para um vendedor.`;
+                generateContent(prompt, llmResultsArea, loadingSpinner);
+            }
+
+            function handleGenerateCaptionAndHashtags(taskData, weekTitle, niche, llmResultsArea, loadingSpinner) {
+                const prompt = `Crie uma legenda curta (até 150 caracteres) e 5 hashtags relevantes para um vídeo do Shopee Vídeos com a seguinte ideia: '${taskData.basePrompt}'. O vídeo é sobre '${weekTitle}'. O nicho principal é '${niche}'. As hashtags devem ser populares e específicas para o nicho.`;
+                generateContent(prompt, llmResultsArea, loadingSpinner);
+            }
+
+            function renderChallenge(optionKey) {
+                const challenge = challengeData[optionKey];
+                document.getElementById('current-challenge-title').textContent = challenge.title;
+                document.getElementById('current-challenge-description').textContent = challenge.description;
+
+                const dynamicContentDiv = document.getElementById('dynamic-challenge-content');
+                dynamicContentDiv.innerHTML = ''; 
+
+                const navLinksContainer = document.getElementById('main-nav');
+                navLinksContainer.innerHTML = ''; 
+
+                challenge.weeks.forEach((week, index) => {
+                    const navItem = document.createElement('li');
+                    navItem.innerHTML = `<a href="#${week.id}" class="nav-link">Semana ${index + 1}</a>`;
+                    navLinksContainer.appendChild(navItem);
+
+                    const weekSection = document.createElement('section');
+                    weekSection.id = week.id;
+                    weekSection.className = `mb-16 pt-16 -mt-16`;
+                    weekSection.innerHTML = `
+                        <h2 class="text-3xl font-bold mb-3 ${getWeekTitleColorClass(optionKey, index)} border-b-2 ${getWeekBorderColorClass(optionKey, index)} pb-2">${week.title}</h2>
+                        <p class="text-gray-600 mb-8">${challenge.description}</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+                    `;
+                    const tasksGrid = weekSection.querySelector('.grid');
+
+                    week.tasks.forEach((task, taskIndex) => {
+                        const taskCard = document.createElement('div');
+                        taskCard.className = `task-card bg-white p-5 rounded-xl shadow-lg border-transparent`;
+                        taskCard.setAttribute('data-day', `${index * 7 + taskIndex + 1}`); 
+                        taskCard.innerHTML = `
+                            <div class="flex justify-between items-start mb-3">
+                                <h3 class="task-title text-xl font-bold text-gray-800">${task.days}: ${task.idea.split(':')[0]}</h3>
+                                <div class="flex items-center space-x-2">
+                                    <input type="checkbox" class="task-checkbox h-5 w-5 rounded ${getCheckboxColorClass(optionKey, index)}">
+                                </div>
+                            </div>
+                            <p class="font-semibold text-gray-700 mb-2">💡 Ideia de Vídeo:</p>
+                            <p class="text-gray-600 mb-4">${task.idea.split(':').slice(1).join(':').trim() || task.idea}</p>
+                            <div class="tips-content hidden">
+                                <p class="font-semibold text-gray-700 mb-2">🎬 Dicas de Produção:</p>
+                                <p class="text-gray-600">${task.tips}</p>
+                            </div>
+                            <button class="toggle-tips-btn mt-2 text-sm font-semibold ${getButtonColorClass(optionKey, index)}">Ver Dicas</button>
+                            <div class="mt-4 flex flex-col sm:flex-row gap-2">
+                                <button class="generate-idea-btn flex-1 bg-orange-500 text-white text-sm font-semibold py-2 px-3 rounded-md hover:bg-orange-600 transition-colors">✨ Gerar Ideia de Vídeo</button>
+                                <button class="generate-caption-btn flex-1 bg-blue-500 text-white text-sm font-semibold py-2 px-3 rounded-md hover:bg-blue-600 transition-colors">✨ Gerar Legenda/Hashtags</button>
+                            </div>
+                            <div class="llm-results-area mt-4 hidden"></div>
+                            <div class="llm-loading-spinner text-sm text-gray-500 mt-2"></div>
+                        `;
+                        tasksGrid.appendChild(taskCard);
+                    });
+                    dynamicContentDiv.appendChild(weekSection);
+                });
+
+                const dicasNavItem = document.createElement('li');
+                dicasNavItem.innerHTML = `<a href="#dicas" class="nav-link">Dicas</a>`;
+                navLinksContainer.appendChild(dicasNavItem);
+
+                const bonusNavItem = document.createElement('li');
+                bonusNavItem.innerHTML = `<a href="#bonus" class="nav-link">Bônus</a>`;
+                navLinksContainer.appendChild(bonusNavItem);
+
+                attachEventListeners(optionKey);
+                updateChart(optionKey);
+            }
+
+            function getWeekTitleColorClass(optionKey, weekIndex) {
+                const colors = {
+                    option1: ['text-orange-600', 'text-teal-600', 'text-rose-600', 'text-indigo-600'],
+                    option2: ['text-orange-600', 'text-teal-600', 'text-rose-600', 'text-indigo-600'],
+                    option3: ['text-orange-600', 'text-teal-600', 'text-rose-600', 'text-indigo-600'],
+                    option4: ['text-orange-600', 'text-teal-600', 'text-rose-600', 'text-indigo-600']
+                };
+                return colors[optionKey][weekIndex] || 'text-gray-800';
+            }
+
+            function getWeekBorderColorClass(optionKey, weekIndex) {
+                const colors = {
+                    option1: ['border-orange-200', 'border-teal-200', 'border-rose-200', 'border-indigo-200'],
+                    option2: ['border-orange-200', 'border-teal-200', 'border-rose-200', 'border-indigo-200'],
+                    option3: ['border-orange-200', 'border-teal-200', 'border-rose-200', 'border-indigo-200'],
+                    option4: ['border-orange-200', 'border-teal-200', 'border-rose-200', 'border-indigo-200']
+                };
+                return colors[optionKey][weekIndex] || 'border-gray-300';
+            }
+
+            function getCheckboxColorClass(optionKey, weekIndex) {
+                const colors = {
+                    option1: ['text-orange-500', 'text-teal-500', 'text-rose-500', 'text-indigo-500'],
+                    option2: ['text-orange-500', 'text-teal-500', 'text-rose-500', 'text-indigo-500'],
+                    option3: ['text-orange-500', 'text-teal-500', 'text-rose-500', 'text-indigo-500'],
+                    option4: ['text-orange-500', 'text-teal-500', 'text-rose-500', 'text-indigo-500']
+                };
+                return `focus:ring-${colors[optionKey][weekIndex].split('-')[0]}-400 ${colors[optionKey][weekIndex]}`;
+            }
+
+            function getButtonColorClass(optionKey, weekIndex) {
+                const colors = {
+                    option1: ['text-orange-600', 'text-teal-600', 'text-rose-600', 'text-indigo-600'],
+                    option2: ['text-orange-600', 'text-teal-600', 'text-rose-600', 'text-indigo-600'],
+                    option3: ['text-orange-600', 'text-teal-600', 'text-rose-600', 'text-indigo-600'],
+                    option4: ['text-orange-600', 'text-teal-600', 'text-rose-600', 'text-indigo-600']
+                };
+                return `hover:text-${colors[optionKey][weekIndex].split('-')[0]}-800 ${colors[optionKey][weekIndex]}`;
+            }
+
+            function updateChart(optionKey) {
+                const challenge = challengeData[optionKey];
+                const labels = challenge.weeks.map(week => wrapLabel(week.title, 16));
+                const data = challenge.weeks.map(week => week.tasks.length);
+                const backgroundColors = challenge.weeks.map(week => week.color);
+                const borderColors = challenge.weeks.map(week => week.border);
+
+                if (challengeChartInstance) {
+                    challengeChartInstance.data.labels = labels;
+                    challengeChartInstance.data.datasets[0].data = data;
+                    challengeChartInstance.data.datasets[0].backgroundColor = backgroundColors;
+                    challengeChartInstance.data.datasets[0].borderColor = borderColors;
+                    challengeChartInstance.update();
+                } else {
+                    const ctx = document.getElementById('challengeChart').getContext('2d');
+                    challengeChartInstance = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Dias no Desafio',
+                                data: data,
+                                backgroundColor: backgroundColors,
+                                borderColor: borderColors,
+                                borderWidth: 2,
+                                hoverOffset: 10
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: {
+                                        padding: 20,
+                                        font: {
+                                            size: 14
+                                        }
+                                    }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            let label = context.label || '';
+                                            if (Array.isArray(label)) {
+                                                label = label.join(' ');
+                                            }
+                                            if (label) {
+                                                label += ': ';
+                                            }
+                                            if (context.parsed !== null) {
+                                                label += context.parsed + ' dias';
+                                            }
+                                            return label;
+                                        }
+                                    }
+                                }
+                            },
+                            onClick: (event, elements) => {
+                                if (elements.length > 0) {
+                                    const i = elements[0].index;
+                                    const sectionId = challenge.weeks[i].id;
+                                    const section = document.querySelector(`#${sectionId}`);
+                                    if (section) {
+                                        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
+            function attachEventListeners(currentOptionKey) {
+                const tipButtons = document.querySelectorAll('.toggle-tips-btn');
+                tipButtons.forEach(button => {
+                    button.onclick = null; 
+                    button.addEventListener('click', () => {
+                        const tipsContent = button.previousElementSibling;
+                        const isHidden = tipsContent.classList.contains('hidden');
+                        tipsContent.classList.toggle('hidden');
+                        button.textContent = isHidden ? 'Ocultar Dicas' : 'Ver Dicas';
+                    });
+                });
+
+                const checkboxes = document.querySelectorAll('.task-checkbox');
+                checkboxes.forEach(checkbox => {
+                    checkbox.onchange = null; 
+                    checkbox.addEventListener('change', (e) => {
+                        const card = e.target.closest('.task-card');
+                        if (e.target.checked) {
+                            card.classList.add('completed');
+                        } else {
+                            card.classList.remove('completed');
+                        }
+                    });
+                });
+
+                document.querySelectorAll('nav a').forEach(anchor => {
+                    anchor.onclick = null; 
+                    anchor.addEventListener('click', function (e) {
+                        e.preventDefault();
+                        document.querySelector(this.getAttribute('href')).scrollIntoView({
+                            behavior: 'smooth'
+                        });
+                    });
+                });
+
+                const generateIdeaButtons = document.querySelectorAll('.generate-idea-btn');
+                generateIdeaButtons.forEach(button => {
+                    button.onclick = null; 
+                    button.addEventListener('click', (e) => {
+                        const card = e.target.closest('.task-card');
+                        const dayAttr = card.getAttribute('data-day');
+                        const weekIndex = Math.floor((parseInt(dayAttr) - 1) / 7); 
+                        const taskIndex = (parseInt(dayAttr) - 1) % 7;
+
+                        const challenge = challengeData[currentOptionKey];
+                        const week = challenge.weeks[weekIndex];
+                        const task = week.tasks[taskIndex];
+
+                        const llmResultsArea = card.querySelector('.llm-results-area');
+                        llmResultsArea.classList.remove('hidden');
+                        const loadingSpinner = card.querySelector('.llm-loading-spinner');
+                        
+                        handleGenerateVideoIdea(task, week.title, week.niche, llmResultsArea, loadingSpinner);
+                    });
+                });
+
+                const generateCaptionButtons = document.querySelectorAll('.generate-caption-btn');
+                generateCaptionButtons.forEach(button => {
+                    button.onclick = null; 
+                    button.addEventListener('click', (e) => {
+                        const card = e.target.closest('.task-card');
+                        const dayAttr = card.getAttribute('data-day');
+                        const weekIndex = Math.floor((parseInt(dayAttr) - 1) / 7);
+                        const taskIndex = (parseInt(dayAttr) - 1) % 7;
+
+                        const challenge = challengeData[currentOptionKey];
+                        const week = challenge.weeks[weekIndex];
+                        const task = week.tasks[taskIndex];
+
+                        const llmResultsArea = card.querySelector('.llm-results-area');
+                        llmResultsArea.classList.remove('hidden');
+                        const loadingSpinner = card.querySelector('.llm-loading-spinner');
+
+                        handleGenerateCaptionAndHashtags(task, week.title, week.niche, llmResultsArea, loadingSpinner);
+                    });
+                });
+            }
+
+            renderChallenge('option4');
+
+            const challengeSelectors = document.querySelectorAll('input[name="challenge_option"]');
+            challengeSelectors.forEach(selector => {
+                selector.addEventListener('change', (e) => {
+                    renderChallenge(e.target.value);
+                });
+            });
+        });
+    </script>
+
+</body>
+</html>
